@@ -333,7 +333,7 @@ def move(chess1, chess2, next_pos):
                 if x[1] == 2:
                     chess2[x[2]] = x[0]
                 chess1[i] = temp
-                draw_text("You would be in check!", 225, 250, 15)
+                draw_text("Checkmate", 225, 250, 15)
                 return 2  # Move is not allowed because it would result in check
             else:
                 bj = 0
@@ -351,7 +351,7 @@ def move(chess1, chess2, next_pos):
                 if x[1] == 2:
                     chess2[x[2]] = x[0]
                 chess1[i] = temp
-                draw_text("You would be in check!", 225, 250, 15)
+                draw_text("Still Checkmate", 225, 250, 15)
                 return 2
             else:
                 bj = 0
@@ -369,7 +369,7 @@ def move(chess1, chess2, next_pos):
                 if x[1] == 2:
                     chess2[x[2]] = x[0]
                 chess1[i] = temp
-                draw_text("You would be in check!", 225, 250, 15)
+                draw_text("Still Checkmate!", 225, 250, 15)
                 return 2
             else:
                 bj = 0
@@ -387,7 +387,7 @@ def move(chess1, chess2, next_pos):
                 if x[1] == 2:
                     chess2[x[2]] = x[0]
                 chess1[i] = temp
-                draw_text("You would be in check!", 225, 250, 15)
+                draw_text("Still Checkmate!", 225, 250, 15)
                 return 2
             else:
                 bj = 0
@@ -405,7 +405,7 @@ def move(chess1, chess2, next_pos):
                 if x[1] == 2:
                     chess2[x[2]] = x[0]
                 chess1[i] = temp
-                draw_text("You would be in check!", 225, 250, 15)
+                draw_text("Still Checkmate!", 225, 250, 15)
                 return 2
             else:
                 bj = 0
@@ -423,7 +423,7 @@ def move(chess1, chess2, next_pos):
                 if x[1] == 2:
                     chess2[x[2]] = x[0]
                 chess1[i] = temp
-                draw_text("You would be in check!", 225, 250, 15)
+                draw_text("Still Checkmate!", 225, 250, 15)
                 return 2
             else:
                 bj = 0
@@ -441,7 +441,7 @@ def move(chess1, chess2, next_pos):
                 if x[1] == 2:
                     chess2[x[2]] = x[0]
                 chess1[i] = temp
-                draw_text("You would be in check!", 225, 250, 15)
+                draw_text("Still Checkmate!", 225, 250, 15)
                 return 2
             else:
                 bj = 0
@@ -668,21 +668,26 @@ def chess_jam(chess1, chess2):
 white = (255, 255, 255)
 black = (0, 0, 0)
 
+def highlight_piece(pos, color=(255,255,0), border_width=3):
+    # pos is a two-element list [col, row] where each cell is 50x50 pixels.
+    rect = pygame.Rect(pos[0]*50, pos[1]*50, 50, 50)
+    pygame.draw.rect(screen, color, rect, border_width)
+    pygame.display.update(rect)
 
 
-def draw_text(text, x, y, size, pad_right=20):
+def draw_text(text, x, y, size, pad_left=20, pad_right=20):
     pygame.font.init()
-    fontObj = pygame.font.SysFont('Arial', size = 24, bold=True)
-    # Render the text with a background (black) and text color (white)
+    fontObj = pygame.font.SysFont('Arial', size, bold=True)
+    # Render the text with white on a black background
     textSurfaceObj = fontObj.render(text, True, white, black)
     # Get the original size
     text_width, text_height = textSurfaceObj.get_size()
-    # Create a new surface with extra width for right padding
-    new_width = text_width + pad_right
+    # Create a new surface with extra width for left and right padding
+    new_width = text_width + pad_left + pad_right
     padded_surface = pygame.Surface((new_width, text_height))
     padded_surface.fill(black)
-    # Blit the text onto the new surface at (0, 0)
-    padded_surface.blit(textSurfaceObj, (0, 0))
+    # Blit the text onto the padded surface at an offset for left padding
+    padded_surface.blit(textSurfaceObj, (pad_left, 0))
     # Get the rectangle of the padded surface and set its center
     textRectObj = padded_surface.get_rect()
     textRectObj.center = (x, y)
@@ -692,6 +697,17 @@ def draw_text(text, x, y, size, pad_right=20):
 
 
 
+def highlight_piece(pos, color=(255,255,0), border_width=3):
+    """
+    Draws an outline around the board cell at the given position.
+    pos: a list [col, row] indicating the cell position.
+    color: the highlight color (default yellow).
+    border_width: thickness of the outline.
+    """
+    rect = pygame.Rect(pos[0] * 50, pos[1] * 50, 50, 50)
+    pygame.draw.rect(screen, color, rect, border_width)
+    pygame.display.update(rect)
+
 if __name__ == '__main__':
     all_pos, progress = [], []
     for i in range(10):
@@ -700,6 +716,7 @@ if __name__ == '__main__':
     draw_text('Red First', 225, 525, 15)
     chess_kind = 0
     gameover = 0
+    selected_piece = None
     while True:
         draw_chess()
         for event in pygame.event.get():
@@ -708,12 +725,20 @@ if __name__ == '__main__':
                 sys.exit()
             elif event.type == MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
+                cell = [pos[0] // 50, pos[1] // 50]
+                
+                # Determine which side is active
                 if chess_kind == 0:
                     chess1, chess2 = red_chess, black_chess
                 elif chess_kind == 1:
                     chess1, chess2 = black_chess, red_chess
+                
+                #If no piece is selected and the click hits one of our pieces, select it.
                 for i in range(len(chess1)):
-                    if chess1[i][0] * 50 < pos[0] < (chess1[i][0] + 1) * 50 and chess1[i][1] * 50 < pos[1] < ((chess1[i][1] + 1) * 50):
+                    if (chess1[i][0] * 50 < pos[0] < (chess1[i][0] + 1) * 50 and 
+                        chess1[i][1] * 50 < pos[1] < ((chess1[i][1] + 1) * 50)):
+                        # Draw a green highlight on the selected piece
+                        highlight_piece(chess1[i], color=(0, 255, 0), border_width=4)
                         flag = False
                         while True:
                             for event in pygame.event.get():
@@ -722,7 +747,7 @@ if __name__ == '__main__':
                                     next_pos = [pos[0] // 50, pos[1] // 50]
                                     flag = True
                                     break
-                            if flag == True:
+                            if flag:
                                 break
                         progress.append(move(chess1, chess2, next_pos))
                         jj = 0
@@ -739,10 +764,8 @@ if __name__ == '__main__':
                                 print("cj:", cj)
                                 if cj[0] != 1:
                                     gameover = 1
-                                    draw_text("Decisive Move", 225, 250, 30)
-                                    draw_text('Red wins', 225, 525, 15)
+                                    draw_text("Red wins!", 225, 250, 30)
                                 else:
-                                    draw_text('Check', 150, 525, 15)
                                     draw_text("Black's turn", 225, 525, 15)
                             else:
                                 draw_text('    ', 150, 525, 15)
@@ -754,10 +777,8 @@ if __name__ == '__main__':
                                 print("cj:", cj)
                                 if cj[0] != 1:
                                     gameover = 1
-                                    draw_text("Decisive Move", 225, 250, 30)
-                                    draw_text('Black wins', 225, 525, 15)
+                                    draw_text("Black wins!", 225, 250, 30)
                                 else:
-                                    draw_text('Check', 150, 525, 15)
                                     draw_text("Red's turn", 225, 525, 15)
                             else:
                                 draw_text('            ', 150, 525, 15)
