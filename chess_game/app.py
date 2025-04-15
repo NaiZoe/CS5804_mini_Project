@@ -2,6 +2,8 @@ import pygame
 import sys
 from pygame.locals import *
 from os import path
+import copy
+
 
 cur_path = path.dirname(__file__)
 img_path = path.join(cur_path, 'images')
@@ -33,6 +35,137 @@ red_chess = [[0, 6], [2, 6], [4, 6], [6, 6], [8, 6], [1, 7], [7, 7], [0, 9], [1,
              [6, 9], [7, 9], [8, 9]]
 black_chess = [[0, 3], [2, 3], [4, 3], [6, 3], [8, 3], [1, 2], [7, 2], [0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0],
                [6, 0], [7, 0], [8, 0]]
+
+
+
+# Mapping chess index to piece type
+red_piece_names = {
+    0: 'soldier', 1: 'soldier', 2: 'soldier', 3: 'soldier', 4: 'soldier',
+    5: 'cannon', 6: 'cannon',
+    7: 'car', 8: 'horse', 9: 'elephant', 10: 'attendant',
+    11: 'general', 12: 'attendant', 13: 'elephant', 14: 'horse', 15: 'car'
+}
+
+black_piece_names = {
+    0: 'soldier', 1: 'soldier', 2: 'soldier', 3: 'soldier', 4: 'soldier',
+    5: 'cannon', 6: 'cannon',
+    7: 'car', 8: 'horse', 9: 'elephant', 10: 'attendant',
+    11: 'general', 12: 'attendant', 13: 'elephant', 14: 'horse', 15: 'car'
+}
+
+
+def evaluate_board(red_chess, black_chess):
+    piece_values = {
+        'soldier': 10, 'cannon': 35, 'car': 50,
+        'horse': 30, 'elephant': 25, 'attendant': 20,
+        'general': 1000
+    }
+
+    score = 0
+    for i in range(len(red_chess)):
+        if red_chess[i] != [-1, -1]:
+            piece = red_piece_names[i]
+            score += piece_values[piece]
+    for i in range(len(black_chess)):
+        if black_chess[i] != [-1, -1]:
+            piece = black_piece_names[i]
+            score -= piece_values[piece]
+    return score  # higher is better for red
+
+
+
+def get_all_moves(chess1, chess2, is_red):
+    all_moves = []
+    for i in range(len(chess1)):
+        if chess1[i] == [-1, -1]:
+            continue
+        piece = red_piece_names[i] if is_red else black_piece_names[i]
+        for x in range(9):
+            for y in range(10):
+                dest = [x, y]
+                move_result = None
+                try:
+                    if piece == 'soldier':
+                        move_result = soldier_rule(chess1, chess2, chess1[i][:], dest)
+                    elif piece == 'car':
+                        move_result = car_rule(chess1, chess2, chess1[i][:], dest)
+                    elif piece == 'cannon':
+                        move_result = cannon_rule(chess1, chess2, chess1[i][:], dest)
+                    elif piece == 'horse':
+                        move_result = horse_rule(chess2, chess1[i][:], dest)
+                    elif piece == 'elephant':
+                        move_result = elephant_rule(chess2, chess1[i][:], dest)
+                    elif piece == 'attendant':
+                        move_result = attendant_rule(chess1, chess2, chess1[i][:], dest)
+                    elif piece == 'general':
+                        move_result = boss_rule(chess1, chess2, chess1[i][:], dest, chess2[11])
+                except:
+                    continue
+                if move_result and move_result != 0:
+                    all_moves.append((i, dest))  # (piece index, new position)
+    return all_moves
+
+def simulate_move(chess1, chess2, move):
+    i, dest = move
+    chess1_copy = copy.deepcopy(chess1)
+    chess2_copy = copy.deepcopy(chess2)
+
+    piece = red_piece_names[i] if chess1 is red_chess else black_piece_names[i]
+    
+    if piece == 'soldier':
+        result = soldier_rule(chess1_copy, chess2_copy, chess1_copy[i], dest)
+    elif piece == 'car':
+        result = car_rule(chess1_copy, chess2_copy, chess1_copy[i], dest)
+    elif piece == 'cannon':
+        result = cannon_rule(chess1_copy, chess2_copy, chess1_copy[i], dest)
+    elif piece == 'horse':
+        result = horse_rule(chess2_copy, chess1_copy[i], dest)
+    elif piece == 'elephant':
+        result = elephant_rule(chess2_copy, chess1_copy[i], dest)
+    elif piece == 'attendant':
+        result = attendant_rule(chess1_copy, chess2_copy, chess1_copy[i], dest)
+    elif piece == 'general':
+        result = boss_rule(chess1_copy, chess2_copy, chess1_copy[i], dest, chess2_copy[11])
+    
+    if result and result != 0:
+        chess1_copy[i] = result[0]
+    return chess1_copy, chess2_copy
+
+
+def minimax(depth, is_maximizing, red, black):
+    if depth == 0:
+        return evaluate_board(red, black)
+
+    if is_maximizing:
+        max_eval = float('-inf')
+        moves = get_all_moves(red, black, is_red=True)
+        for move in moves:
+            new_red, new_black = simulate_move(red, black, move)
+            eval = minimax(depth - 1, False, new_red, new_black)
+            max_eval = max(max_eval, eval)
+        return max_eval
+    else:
+        min_eval = float('inf')
+        moves = get_all_moves(black, red, is_red=False)
+        for move in moves:
+            new_black, new_red = simulate_move(black, red, move)
+            eval = minimax(depth - 1, True, new_red, new_black)
+            min_eval = min(min_eval, eval)
+        return min_eval
+def find_best_move(red, black, depth=2):
+    best_score = float('-inf')
+    best_move = None
+    for index, move in enumerate(get_all_moves(red, black, is_red=True)):
+        new_red, new_black = simulate_move(red, black, move)
+        score = minimax(depth - 1, False, new_red, new_black)
+        if score > best_score:
+            best_score = score
+            best_move = move
+            best_index = index  # Save the piece's index
+    if best_move:
+        print(f"AI chose move: piece {best_index} -> {best_move[1]}")
+    return best_move
+
 
 
 # Draw the Chess pieces on the board
@@ -728,8 +861,20 @@ if __name__ == '__main__':
                 cell = [pos[0] // 50, pos[1] // 50]
                 
                 # Determine which side is active
-                if chess_kind == 0:
-                    chess1, chess2 = red_chess, black_chess
+                # if chess_kind == 0:
+                #     chess1, chess2 = red_chess, black_chess
+                if chess_kind == 0:  # Red (AI) turn
+                    draw_text("Red (AI) thinking...", 225, 525, 15)
+                    pygame.time.wait(500)  # optional delay to simulate thinking
+
+                    best_move = find_best_move(red_chess, black_chess, depth=2)
+                    if best_move:
+                        index, new_pos = best_move
+                        red_chess[index] = new_pos
+
+                    chess_kind = 1  # switch to black (player)
+                    draw_text("Black's turn", 225, 525, 15)
+                    continue
                 elif chess_kind == 1:
                     chess1, chess2 = black_chess, red_chess
                 
