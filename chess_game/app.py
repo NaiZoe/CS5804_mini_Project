@@ -872,6 +872,10 @@ if __name__ == '__main__':
                         index, new_pos = best_move
                         red_chess[index] = new_pos
 
+                        # Clear board and redraw after AI move
+                        screen.blit(img_board, (0, 0))
+                        draw_chess()
+
                     chess_kind = 1  # switch to black (player)
                     draw_text("Black's turn", 225, 525, 15)
                     continue
