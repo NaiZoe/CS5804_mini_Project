@@ -145,7 +145,6 @@ def simulate_move(chess1, chess2, move):
     return chess1_copy, chess2_copy
 
 
-
 def minimax(depth, is_maximizing, red, black):
     if depth == 0:
         return evaluate_board(red, black)
@@ -179,6 +178,24 @@ def find_best_move(red, black, depth=2):
     if best_move:
         print(f"AI chose move: piece {best_index} -> {best_move[1]}")
     return best_move
+
+#New added to check end of the game
+def is_check(attacker, defender):
+
+    return check(attacker, defender) == 1
+
+def is_checkmate(defender, attacker, defender_is_red):
+
+    if not is_check(attacker, defender):
+        return False                    # not even in check
+
+    # test every legal move for the defender on copies of the board
+    for mv in get_all_moves(defender, attacker, is_red=defender_is_red):
+        new_def, new_att = simulate_move(defender, attacker, mv)
+        if not is_check(new_att, new_def):     # found an escape
+            return False
+    return True                         # no escape → checkmate
+
 
 
 
@@ -855,28 +872,32 @@ def highlight_piece(pos, color=(255,255,0), border_width=3):
     pygame.draw.rect(screen, color, rect, border_width)
     pygame.display.update(rect)
 
+# ---------------------------------------------------------------------
+#  MAIN LOOP  — drop-in replacement
+# ---------------------------------------------------------------------
 if __name__ == '__main__':
-    # ---------------- initial setup ----------------
-    all_pos, progress = [], []
-    for r in range(10):
-        for c in range(9):
-            all_pos.append([c, r])
-
     draw_text('Red First', 225, 525, 15)
 
-    chess_kind = 0          # 0 = red-to-move (AI), 1 = black-to-move (human)
-    gameover   = 0
-    bj         = 0          # (your existing “check” helper flag)
+    chess_kind = 0          # 0 → red (AI) to move, 1 → black (human)
+    gameover   = False
 
     while True:
         draw_chess()
+
+        # allow window to be closed after the game is over
+        if gameover:
+            for ev in pygame.event.get():
+                if ev.type == QUIT:
+                    pygame.quit()
+                    sys.exit()
+            continue
 
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
 
-            # ─────────────────── AI TURN (red) ────────────────────────
+            # ===================  AI TURN  (red) ====================
             if chess_kind == 0:
                 draw_text("Red (AI) thinking...", 225, 525, 15)
                 pygame.time.wait(500)
@@ -889,68 +910,66 @@ if __name__ == '__main__':
                                                        best_move)
                     red_chess[:]   = new_red
                     black_chess[:] = new_black
-
                     screen.blit(img_board, (0, 0))
                     draw_chess()
 
+                # ----------- did the AI capture Black's general? ------------
+                if black_chess[11] == [-1, -1]:
+                    draw_text("Red wins!", 225, 250, 30)
+                    gameover = True
+                    break
+                # ------------------------------------------------------------
+
+                # check normal check-mate
+                if is_checkmate(black_chess, red_chess, defender_is_red=False):
+                    draw_text("Red wins!", 225, 250, 30)
+                    gameover = True
+                    break
+
                 chess_kind = 1
                 draw_text("Black's turn", 225, 525, 15)
-                continue      # wait for the next event (human click)
+                break   # wait for human click
 
-            # ─────────────────── HUMAN TURN (black) ───────────────────
+            # =================  HUMAN TURN  (black) ==================
             if event.type == MOUSEBUTTONDOWN and chess_kind == 1:
-                pos  = pygame.mouse.get_pos()
-                cell = [pos[0] // 50, pos[1] // 50]
+                pos = pygame.mouse.get_pos()
 
-                chess1, chess2 = black_chess, red_chess   # aliases for helpers
+                # find which piece (if any) the user clicked
+                for i, pc in enumerate(black_chess):
+                    if pc == [-1, -1]:
+                        continue
+                    if pc[0]*50 < pos[0] < (pc[0]+1)*50 and pc[1]*50 < pos[1] < (pc[1]+1)*50:
+                        highlight_piece(pc, color=(0,255,0), border_width=4)
 
-                # if the click hits one of the player's pieces, handle selection
-                for i in range(len(chess1)):
-                    if (chess1[i][0] * 50 < pos[0] < (chess1[i][0] + 1) * 50 and
-                        chess1[i][1] * 50 < pos[1] < (chess1[i][1] + 1) * 50):
-
-                        highlight_piece(chess1[i], color=(0, 255, 0), border_width=4)
-
-                        # wait for destination click
+                        # wait for the destination click
                         while True:
                             e = pygame.event.wait()
-                            if e.type == MOUSEBUTTONDOWN:
-                                next_pos = [e.pos[0] // 50, e.pos[1] // 50]
-                                break
                             if e.type == QUIT:
                                 pygame.quit()
                                 sys.exit()
+                            if e.type == MOUSEBUTTONDOWN:
+                                dest = [e.pos[0]//50, e.pos[1]//50]
+                                break
 
-                        progress.append(move(chess1, chess2, next_pos))
-
-                        # if a legal move was executed, toggle side to move
-                        if progress[-1] not in (None, 0, 2):
+                        mv_result = move(black_chess, red_chess, dest)
+                        if mv_result not in (None, 0, 2):   # legal move
                             chess_kind = 0
 
-                        # ---- your existing check / mate logic -------------
-                        jj = check(chess1, chess2) if progress[-1] not in (None,0,2) else 0
-                        if chess_kind == 1:   # still black to move
-                            if jj == 1:
-                                bj = 1
-                                cj = chess_jam(chess2, chess1)
-                                if cj[0] != 1:
-                                    gameover = 1
-                                    draw_text("Red wins!", 225, 250, 30)
-                            draw_text("Black's turn", 225, 525, 15)
-                        else:                 # red to move
-                            if jj == 1:
-                                bj = 1
-                                cj = chess_jam(chess2, chess1)
-                                if cj[0] != 1:
-                                    gameover = 1
-                                    draw_text("Black wins!", 225, 250, 30)
-                            draw_text("Red's turn", 225, 525, 15)
-                        # ---------------------------------------------------
+                            # ------- did the human capture Red's general? -------
+                            if red_chess[11] == [-1, -1]:
+                                draw_text("Black wins!", 225, 250, 30)
+                                gameover = True
+                                break
+                            # ----------------------------------------------------
 
-                        if gameover:
-                            while True:
-                                ev = pygame.event.wait()
-                                if ev.type == QUIT:
-                                    pygame.quit()
-                                    sys.exit()
-                        break   # out of piece-search loop
+                            # normal check-mate test
+                            if is_checkmate(red_chess, black_chess,
+                                            defender_is_red=True):
+                                draw_text("Black wins!", 225, 250, 30)
+                                gameover = True
+                                break
+
+                        draw_text("Red's turn"  if chess_kind==0 else
+                                  "Black's turn", 225, 525, 15)
+                        break  # out of piece-search loop
+                break          # out of main event loop iteration
