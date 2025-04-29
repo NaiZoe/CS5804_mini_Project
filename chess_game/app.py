@@ -83,35 +83,44 @@ def get_all_moves(chess1, chess2, is_red):
         for x in range(9):
             for y in range(10):
                 dest = [x, y]
-                move_result = None
+                #Use copy so it dont change the original chessboard
+                c1 = copy.deepcopy(chess1)
+                c2 = copy.deepcopy(chess2)
                 try:
-                    if piece == 'soldier':
-                        move_result = soldier_rule(chess1, chess2, chess1[i][:], dest)
+                    if   piece == 'soldier':
+                        move_result = soldier_rule(c1, c2, c1[i][:], dest)
                     elif piece == 'car':
-                        move_result = car_rule(chess1, chess2, chess1[i][:], dest)
+                        move_result = car_rule(c1, c2, c1[i][:], dest)
                     elif piece == 'cannon':
-                        move_result = cannon_rule(chess1, chess2, chess1[i][:], dest)
+                        move_result = cannon_rule(c1, c2, c1[i][:], dest)
                     elif piece == 'horse':
-                        move_result = horse_rule(chess2, chess1[i][:], dest)
+                        move_result = horse_rule(c2, c1[i][:], dest)
                     elif piece == 'elephant':
-                        move_result = elephant_rule(chess2, chess1[i][:], dest)
+                        move_result = elephant_rule(c2, c1[i][:], dest)
                     elif piece == 'attendant':
-                        move_result = attendant_rule(chess1, chess2, chess1[i][:], dest)
+                        move_result = attendant_rule(c1, c2, c1[i][:], dest)
                     elif piece == 'general':
-                        move_result = boss_rule(chess1, chess2, chess1[i][:], dest, chess2[11])
-                except:
-                    continue
+                        move_result = boss_rule(c1, c2, c1[i][:], dest, c2[11])
+                    else:
+                        move_result = None
+                except Exception:
+                    move_result = None
+
                 if move_result and move_result != 0:
-                    all_moves.append((i, dest))  # (piece index, new position)
+                    all_moves.append((i, dest))
     return all_moves
 
 def simulate_move(chess1, chess2, move):
+    """
+    Play `move` on deep-copies of (chess1, chess2) and return the two new lists.
+    A capture is recorded in the returned copies.
+    """
     i, dest = move
     chess1_copy = copy.deepcopy(chess1)
     chess2_copy = copy.deepcopy(chess2)
 
     piece = red_piece_names[i] if chess1 is red_chess else black_piece_names[i]
-    
+
     if piece == 'soldier':
         result = soldier_rule(chess1_copy, chess2_copy, chess1_copy[i], dest)
     elif piece == 'car':
@@ -124,12 +133,17 @@ def simulate_move(chess1, chess2, move):
         result = elephant_rule(chess2_copy, chess1_copy[i], dest)
     elif piece == 'attendant':
         result = attendant_rule(chess1_copy, chess2_copy, chess1_copy[i], dest)
-    elif piece == 'general':
-        result = boss_rule(chess1_copy, chess2_copy, chess1_copy[i], dest, chess2_copy[11])
-    
+    else:  # general
+        result = boss_rule(chess1_copy, chess2_copy, chess1_copy[i], dest,
+                           chess2_copy[11])
+
     if result and result != 0:
-        chess1_copy[i] = result[0]
+        chess1_copy[i] = result[0]           # move piece
+        if result[1] == 2:                   # capture → erase victim
+            chess2_copy[result[2]] = [-1, -1]
+
     return chess1_copy, chess2_copy
+
 
 
 def minimax(depth, is_maximizing, red, black):
@@ -842,100 +856,101 @@ def highlight_piece(pos, color=(255,255,0), border_width=3):
     pygame.display.update(rect)
 
 if __name__ == '__main__':
+    # ---------------- initial setup ----------------
     all_pos, progress = [], []
-    for i in range(10):
-        for j in range(9):
-            all_pos.append([j, i])
+    for r in range(10):
+        for c in range(9):
+            all_pos.append([c, r])
+
     draw_text('Red First', 225, 525, 15)
-    chess_kind = 0
-    gameover = 0
-    selected_piece = None
+
+    chess_kind = 0          # 0 = red-to-move (AI), 1 = black-to-move (human)
+    gameover   = 0
+    bj         = 0          # (your existing “check” helper flag)
+
     while True:
         draw_chess()
+
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
-            elif event.type == MOUSEBUTTONDOWN:
-                pos = pygame.mouse.get_pos()
+
+            # ─────────────────── AI TURN (red) ────────────────────────
+            if chess_kind == 0:
+                draw_text("Red (AI) thinking...", 225, 525, 15)
+                pygame.time.wait(500)
+
+                best_move = find_best_move(red_chess, black_chess, depth=2)
+                if best_move:
+                    # play the move on copies and copy them back in-place
+                    new_red, new_black = simulate_move(red_chess,
+                                                       black_chess,
+                                                       best_move)
+                    red_chess[:]   = new_red
+                    black_chess[:] = new_black
+
+                    screen.blit(img_board, (0, 0))
+                    draw_chess()
+
+                chess_kind = 1
+                draw_text("Black's turn", 225, 525, 15)
+                continue      # wait for the next event (human click)
+
+            # ─────────────────── HUMAN TURN (black) ───────────────────
+            if event.type == MOUSEBUTTONDOWN and chess_kind == 1:
+                pos  = pygame.mouse.get_pos()
                 cell = [pos[0] // 50, pos[1] // 50]
-                
-                # Determine which side is active
-                # if chess_kind == 0:
-                #     chess1, chess2 = red_chess, black_chess
-                if chess_kind == 0:  # Red (AI) turn
-                    draw_text("Red (AI) thinking...", 225, 525, 15)
-                    pygame.time.wait(500)  # optional delay to simulate thinking
 
-                    best_move = find_best_move(red_chess, black_chess, depth=2)
-                    if best_move:
-                        index, new_pos = best_move
-                        red_chess[index] = new_pos
+                chess1, chess2 = black_chess, red_chess   # aliases for helpers
 
-                        # Clear board and redraw after AI move
-                        screen.blit(img_board, (0, 0))
-                        draw_chess()
-
-                    chess_kind = 1  # switch to black (player)
-                    draw_text("Black's turn", 225, 525, 15)
-                    continue
-                elif chess_kind == 1:
-                    chess1, chess2 = black_chess, red_chess
-                
-                #If no piece is selected and the click hits one of our pieces, select it.
+                # if the click hits one of the player's pieces, handle selection
                 for i in range(len(chess1)):
-                    if (chess1[i][0] * 50 < pos[0] < (chess1[i][0] + 1) * 50 and 
-                        chess1[i][1] * 50 < pos[1] < ((chess1[i][1] + 1) * 50)):
-                        # Draw a green highlight on the selected piece
+                    if (chess1[i][0] * 50 < pos[0] < (chess1[i][0] + 1) * 50 and
+                        chess1[i][1] * 50 < pos[1] < (chess1[i][1] + 1) * 50):
+
                         highlight_piece(chess1[i], color=(0, 255, 0), border_width=4)
-                        flag = False
+
+                        # wait for destination click
                         while True:
-                            for event in pygame.event.get():
-                                if event.type == MOUSEBUTTONDOWN:
-                                    pos = pygame.mouse.get_pos()
-                                    next_pos = [pos[0] // 50, pos[1] // 50]
-                                    flag = True
-                                    break
-                            if flag:
+                            e = pygame.event.wait()
+                            if e.type == MOUSEBUTTONDOWN:
+                                next_pos = [e.pos[0] // 50, e.pos[1] // 50]
                                 break
+                            if e.type == QUIT:
+                                pygame.quit()
+                                sys.exit()
+
                         progress.append(move(chess1, chess2, next_pos))
-                        jj = 0
-                        if progress[-1] is not None and progress[-1] != 0 and progress[-1] != 2:
-                            if chess_kind == 0:
-                                chess_kind = 1
-                            elif chess_kind == 1:
-                                chess_kind = 0
-                            jj = check(chess1, chess2)
-                        if chess_kind == 1:
+
+                        # if a legal move was executed, toggle side to move
+                        if progress[-1] not in (None, 0, 2):
+                            chess_kind = 0
+
+                        # ---- your existing check / mate logic -------------
+                        jj = check(chess1, chess2) if progress[-1] not in (None,0,2) else 0
+                        if chess_kind == 1:   # still black to move
                             if jj == 1:
                                 bj = 1
                                 cj = chess_jam(chess2, chess1)
-                                print("cj:", cj)
                                 if cj[0] != 1:
                                     gameover = 1
                                     draw_text("Red wins!", 225, 250, 30)
-                                else:
-                                    draw_text("Black's turn", 225, 525, 15)
-                            else:
-                                draw_text('    ', 150, 525, 15)
-                                draw_text("Black's turn", 225, 525, 15)
-                        elif chess_kind == 0:
+                            draw_text("Black's turn", 225, 525, 15)
+                        else:                 # red to move
                             if jj == 1:
                                 bj = 1
                                 cj = chess_jam(chess2, chess1)
-                                print("cj:", cj)
                                 if cj[0] != 1:
                                     gameover = 1
                                     draw_text("Black wins!", 225, 250, 30)
-                                else:
-                                    draw_text("Red's turn", 225, 525, 15)
-                            else:
-                                draw_text('            ', 150, 525, 15)
-                                draw_text("Red's turn", 225, 525, 15)
-                        if gameover == 1:
+                            draw_text("Red's turn", 225, 525, 15)
+                        # ---------------------------------------------------
+
+                        if gameover:
                             while True:
-                                for event in pygame.event.get():
-                                    if event.type == QUIT:
-                                        pygame.quit()
-                                        sys.exit()
-                        break
+                                ev = pygame.event.wait()
+                                if ev.type == QUIT:
+                                    pygame.quit()
+                                    sys.exit()
+                        break   # out of piece-search loop
