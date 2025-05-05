@@ -145,7 +145,7 @@ def simulate_move(chess1, chess2, move):
     return chess1_copy, chess2_copy
 
 
-def minimax(depth, is_maximizing, red, black):
+def alphabeta(depth, alpha, beta, is_maximizing, red, black):
     if depth == 0:
         return evaluate_board(red, black)
 
@@ -154,30 +154,42 @@ def minimax(depth, is_maximizing, red, black):
         moves = get_all_moves(red, black, is_red=True)
         for move in moves:
             new_red, new_black = simulate_move(red, black, move)
-            eval = minimax(depth - 1, False, new_red, new_black)
+            eval = alphabeta(depth - 1, alpha, beta, False, new_red, new_black)
             max_eval = max(max_eval, eval)
+            alpha = max(alpha, eval)
+            if beta <= alpha:
+                break  # Beta cutoff
         return max_eval
     else:
         min_eval = float('inf')
         moves = get_all_moves(black, red, is_red=False)
         for move in moves:
             new_black, new_red = simulate_move(black, red, move)
-            eval = minimax(depth - 1, True, new_red, new_black)
+            eval = alphabeta(depth - 1, alpha, beta, True, new_red, new_black)
             min_eval = min(min_eval, eval)
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break  # Alpha cutoff
         return min_eval
+
+    
+    
 def find_best_move(red, black, depth=2):
     best_score = float('-inf')
     best_move = None
+
     for index, move in enumerate(get_all_moves(red, black, is_red=True)):
         new_red, new_black = simulate_move(red, black, move)
-        score = minimax(depth - 1, False, new_red, new_black)
+        score = alphabeta(depth - 1, float('-inf'), float('inf'), False, new_red, new_black)
         if score > best_score:
             best_score = score
             best_move = move
-            best_index = index  # Save the piece's index
+            best_index = index
+
     if best_move:
-        print(f"AI chose move: piece {best_index} -> {best_move[1]}")
+        print(f"AI chose move: piece {best_index} -> {best_move[1]} (score: {best_score})")
     return best_move
+
 
 #New added to check end of the game
 def is_check(attacker, defender):
