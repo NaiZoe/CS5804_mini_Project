@@ -21,9 +21,13 @@ Minimax Algorithm: Develop a depth-limited search framework with an evaluation f
 Alpha-Beta Optimization: Eliminate branches that are unlikely to influence final move selection
 Move Ordering Heuristics: Improve the Alpha-Beta Optimization by prioritizing promising moves first, so less this need to be evaluated
 
+Demo Video:
+https://youtube.com/shorts/0soIFppjfpw
+
 Resource and Reference: 
 [1] D. Li, AI agent for Chinese chess, http://stanford.edu/~dengl11/resource/doc/221-Report.pdf (accessed Feb. 21, 2025). 
 [2] “How to play Xiangqi / Chinese Chess / 象棋,” Yellow Mountain Imports, https://www.ymimports.com/pages/how-to-play-xiangqi-chinese-chess (accessed Feb. 21, 2025).
 [3] 祁达方, “How to write a Chinese chess AI in Python?,” Zhihu, https://www.zhihu.com/question/29472711 (accessed Mar. 30, 2025). 
 [4] Icybee, “124 lines of Python code to write a Chinese chess engine,” Zhihu, https://zhuanlan.zhihu.com/p/111574757 (accessed Mar. 21, 2025). 
+
 
